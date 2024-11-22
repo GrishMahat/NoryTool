@@ -3,7 +3,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
@@ -12,19 +11,25 @@ import {
   FileCode,
   Maximize2,
   Minimize2,
-  Copy,
-  Check,
-  Search,
   Filter,
   Trash2,
-  EyeOff,
-  Eye,
-  Download,
+  Search,
+  Copy,
+  AlertCircle
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { JSONUtils } from "@/lib/jsonUtils";
+import { JSONUtils, JSONAnalysis, FilterOptions } from "@/lib/jsonUtils";
+import Prism from 'prismjs';
+import 'prismjs/components/prism-json';
+import 'prismjs/plugins/line-numbers/prism-line-numbers';
+import 'prismjs/plugins/line-highlight/prism-line-highlight';
+import 'prismjs/plugins/show-invisibles/prism-show-invisibles';
+import 'prismjs/themes/prism-tomorrow.css';
+import 'prismjs/plugins/line-numbers/prism-line-numbers.css';
+import 'prismjs/plugins/line-highlight/prism-line-highlight.css';
+import { AnalysisView } from '@/components/json/analysis-view';
+import { FilterView } from '@/components/json/filter-view';
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function JSONToolPage() {
   const [input, setInput] = useState("");
@@ -36,44 +41,106 @@ export default function JSONToolPage() {
   const [activeTab, setActiveTab] = useState<
     "beautify" | "minify" | "filter" | "analyze"
   >("beautify");
-  const [filterPath, setFilterPath] = useState("");
-  const [showLineNumbers, setShowLineNumbers] = useState(true);
+  const [analysis, setAnalysis] = useState<JSONAnalysis | null>(null);
+  const [activePanel, setActivePanel] = useState<string | null>(null);
+
+  const sampleJson = {
+    name: "John Doe",
+    age: 30,
+    email: "john@example.com",
+    address: {
+      street: "123 Main St",
+      city: "Boston",
+      country: "USA"
+    },
+    hobbies: ["reading", "gaming", "coding"]
+  };
 
   const handleFormat = useCallback(() => {
     try {
-      const formatted = JSONUtils.format(
-        input,
-        activeTab === "beautify" ? 2 : 0
-      );
+      const parsed = JSON.parse(input);
+      const formatted = JSON.stringify(parsed, null, activeTab === "beautify" ? 2 : 0);
+      const highlighted = Prism.highlight(formatted, Prism.languages.json, 'json');
       setOutput(formatted);
+      
+      const outputElement = document.querySelector('pre.language-json code');
+      if (outputElement) {
+        outputElement.innerHTML = highlighted;
+      }
+
       setError(null);
-    } catch {
-      setError("Invalid JSON format");
-      setOutput("");
+      toast({
+        title: "JSON formatted successfully",
+        variant: "default"
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Invalid JSON");
+      setOutput(input);
+      toast({
+        title: "Error formatting JSON",
+        description: err instanceof Error ? err.message : "Invalid JSON",
+        variant: "destructive"
+      });
     }
   }, [input, activeTab]);
 
-  const handleFilter = useCallback(() => {
+  const handleFilter = useCallback((options: FilterOptions) => {
     try {
-      const filtered = JSONUtils.filterByPath(input, filterPath);
+      const filtered = JSONUtils.filter(input, options);
       setOutput(filtered);
       setError(null);
-    } catch {
-      setError("Invalid JSON or filter path");
-      setOutput("");
+      toast({
+        title: "JSON filtered successfully",
+        variant: "default"
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Filtering failed");
+      toast({
+        title: "Error filtering JSON",
+        description: err instanceof Error ? err.message : "Filtering failed",
+        variant: "destructive"
+      });
     }
-  }, [input, filterPath]);
+  }, [input]);
 
   const handleAnalyze = useCallback(() => {
     try {
-      const analysis = JSONUtils.analyze(input);
-      setOutput(JSON.stringify(analysis, null, 2));
+      const result = JSONUtils.analyze(input);
+      setAnalysis(result);
       setError(null);
-    } catch {
-      setError("Invalid JSON format");
-      setOutput("");
+      toast({
+        title: "JSON analyzed successfully",
+        variant: "default"
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Analysis failed");
+      toast({
+        title: "Error analyzing JSON",
+        description: err instanceof Error ? err.message : "Analysis failed",
+        variant: "destructive"
+      });
     }
   }, [input]);
+
+  const handleCopy = async () => {
+    try {
+      await copyToClipboard(output);
+      setCopyStatus("copied");
+      toast({
+        title: "Copied to clipboard",
+        variant: "default"
+      });
+      setTimeout(() => setCopyStatus("idle"), 2000);
+    } catch {
+      setCopyStatus("failed");
+      toast({
+        title: "Failed to copy",
+        description: "Please try again",
+        variant: "destructive"
+      });
+      setTimeout(() => setCopyStatus("idle"), 2000);
+    }
+  };
 
   useEffect(() => {
     if (!input) return;
@@ -81,57 +148,54 @@ export default function JSONToolPage() {
     if (activeTab === "beautify" || activeTab === "minify") {
       handleFormat();
     } else if (activeTab === "filter") {
-      handleFilter();
+      handleFilter({ path: "" });
     } else if (activeTab === "analyze") {
       handleAnalyze();
     }
-  }, [input, activeTab, filterPath, handleFormat, handleFilter, handleAnalyze]);
+  }, [input, activeTab, handleFormat, handleFilter, handleAnalyze]);
 
-  const handleCopy = async () => {
-    if (!output) return;
-
-    const success = await copyToClipboard(output);
-
-    if (success) {
-      setCopyStatus("copied");
-      toast({
-        title: "Copied to clipboard",
-        description: "The formatted JSON has been copied to your clipboard.",
-      });
-    } else {
-      setCopyStatus("failed");
-      toast({
-        title: "Failed to copy",
-        description: "There was an error copying to the clipboard.",
-        variant: "destructive",
-      });
-    }
-
-    setTimeout(() => setCopyStatus("idle"), 2000);
-  };
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      Prism.highlightAll();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [output]);
 
   const handleReset = () => {
     setInput("");
     setOutput("");
     setError(null);
-    setFilterPath("");
+    toast({
+      title: "Reset successful",
+      variant: "default"
+    });
   };
 
-  const handleDownload = () => {
-    if (!output) return;
+  const handleTabChange = (value: string) => {
+    if (value === activePanel) {
+      setActivePanel(null);
+    } else {
+      setActivePanel(value);
+      if (value === "analyze") {
+        handleAnalyze();
+      }
+    }
+    setActiveTab(value as "beautify" | "minify" | "filter" | "analyze");
+  };
 
-    try {
-      JSONUtils.downloadJSON(output);
-      toast({
-        title: "JSON Downloaded",
-        description: "The formatted JSON has been downloaded.",
-      });
-    } catch {
-      toast({
-        title: "Download Failed",
-        description: "Failed to download the JSON file.",
-        variant: "destructive",
-      });
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target?.result as string;
+        setInput(text);
+        toast({
+          title: "File uploaded successfully",
+          variant: "default"
+        });
+      };
+      reader.readAsText(file);
     }
   };
 
@@ -147,97 +211,18 @@ export default function JSONToolPage() {
         </div>
       </div>
 
-      <div className='grid md:grid-cols-2 gap-6'>
-        <Card className='dark:bg-background'>
-          <CardHeader className='flex flex-row items-center justify-between'>
-            <CardTitle>Input JSON</CardTitle>
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={() => setShowLineNumbers(!showLineNumbers)}
-              title={
-                showLineNumbers ? "Hide line numbers" : "Show line numbers"
-              }>
-              {showLineNumbers ? (
-                <EyeOff className='w-4 h-4' />
-              ) : (
-                <Eye className='w-4 h-4' />
-              )}
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className='relative'>
-              <Textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder='Paste your JSON here...'
-                className='w-full h-[400px] font-mono text-sm resize-none dark:bg-background/50 dark:text-foreground'
-                style={{
-                  lineHeight: "1.5",
-                  tabSize: 2,
-                }}
-              />
-            </div>
-          </CardContent>
-        </Card>
+      {error && (
+        <div className="flex items-center gap-2 p-4 bg-destructive/15 text-destructive rounded-lg">
+          <AlertCircle className="w-4 h-4" />
+          <p>{error}</p>
+        </div>
+      )}
 
-        <Card className='dark:bg-background'>
-          <CardHeader className='flex flex-row items-center justify-between'>
-            <CardTitle>Output</CardTitle>
-            <div className='flex gap-2'>
-              {output && !error && (
-                <>
-                  <Button
-                    size='sm'
-                    variant='ghost'
-                    onClick={handleCopy}
-                    title={
-                      copyStatus === "copied" ? "Copied!" : "Copy to clipboard"
-                    }>
-                    {copyStatus === "copied" ? (
-                      <Check className='w-4 h-4 text-green-500' />
-                    ) : (
-                      <Copy className='w-4 h-4' />
-                    )}
-                  </Button>
-                  <Button
-                    size='sm'
-                    variant='ghost'
-                    onClick={handleDownload}
-                    title='Download JSON'>
-                    <Download className='w-4 h-4' />
-                  </Button>
-                </>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className='relative'>
-              <Textarea
-                value={error ? error : output}
-                readOnly
-                className={`w-full h-[400px] font-mono text-sm resize-none dark:bg-background/50 dark:text-foreground ${
-                  error ? "text-destructive" : ""
-                }`}
-                style={{
-                  lineHeight: "1.5",
-                  tabSize: 2,
-                }}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className='flex flex-col sm:flex-row gap-4 justify-between items-start'>
-        <div className='w-full sm:w-auto'>
+      <div className='flex flex-col space-y-4'>
+        <div className='flex flex-col sm:flex-row gap-4 justify-between items-start'>
           <Tabs
             value={activeTab}
-            onValueChange={(value: string) => {
-              if (value === "beautify" || value === "minify" || value === "filter" || value === "analyze") {
-                setActiveTab(value);
-              }
-            }}
+            onValueChange={handleTabChange}
             className='w-full sm:w-auto'>
             <TabsList className='grid grid-cols-2 sm:grid-cols-4 w-full sm:w-auto'>
               <TabsTrigger value='beautify'>Beautify</TabsTrigger>
@@ -247,46 +232,105 @@ export default function JSONToolPage() {
             </TabsList>
           </Tabs>
 
-          {activeTab === "filter" && (
-            <div className='mt-4'>
-              <Label htmlFor='filterPath'>
-                Filter Path (e.g., &quot;data.users.0&quot;)
-              </Label>
-              <Input
-                id='filterPath'
-                value={filterPath}
-                onChange={(e) => setFilterPath(e.target.value)}
-                placeholder='Enter path to filter'
-                className='mt-1'
-              />
-            </div>
-          )}
+          <div className='flex gap-4 w-full sm:w-auto'>
+            <Button 
+              onClick={handleReset} 
+              variant='secondary'
+              className='flex-1 sm:flex-none'>
+              <Trash2 className='w-4 h-4 mr-2' />
+              Reset
+            </Button>
+            <Button 
+              onClick={handleFormat}
+              className='flex-1 sm:flex-none'>
+              {activeTab === "beautify" ? (
+                <Maximize2 className='w-4 h-4 mr-2' />
+              ) : activeTab === "minify" ? (
+                <Minimize2 className='w-4 h-4 mr-2' />
+              ) : activeTab === "filter" ? (
+                <Filter className='w-4 h-4 mr-2' />
+              ) : (
+                <Search className='w-4 h-4 mr-2' />
+              )}
+              {activeTab === "beautify"
+                ? "Beautify"
+                : activeTab === "minify"
+                ? "Minify"
+                : activeTab === "filter"
+                ? "Filter"
+                : "Analyze"}
+            </Button>
+          </div>
         </div>
 
-        <div className='flex gap-4'>
-          <Button onClick={handleReset} variant='secondary'>
-            <Trash2 className='w-4 h-4 mr-2' />
-            Reset
-          </Button>
-          <Button onClick={handleFormat}>
-            {activeTab === "beautify" ? (
-              <Maximize2 className='w-4 h-4 mr-2' />
-            ) : activeTab === "minify" ? (
-              <Minimize2 className='w-4 h-4 mr-2' />
-            ) : activeTab === "filter" ? (
-              <Filter className='w-4 h-4 mr-2' />
-            ) : (
-              <Search className='w-4 h-4 mr-2' />
-            )}
-            {activeTab === "beautify"
-              ? "Beautify"
-              : activeTab === "minify"
-              ? "Minify"
-              : activeTab === "filter"
-              ? "Filter"
-              : "Analyze"}
-          </Button>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <Button 
+                variant="secondary"
+                onClick={() => setInput(JSON.stringify(sampleJson, null, 2))}
+              >
+                Load Sample JSON
+              </Button>
+              <div className="relative">
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  id="json-upload"
+                />
+                <Button 
+                  variant="secondary"
+                  onClick={() => document.getElementById('json-upload')?.click()}
+                >
+                  Upload JSON
+                </Button>
+              </div>
+            </div>
+            <Textarea
+              placeholder={`Paste your JSON here...\n\nExample:\n{\n  "name": "John Doe",\n  "age": 30,\n  "email": "john@example.com"\n}`}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              className="min-h-[300px] font-mono"
+            />
+          </div>
+          <div className="space-y-4">
+            <Button
+              variant="secondary"
+              onClick={handleCopy}
+              className="w-full"
+              disabled={!output}
+            >
+              <Copy className="w-4 h-4 mr-2" />
+              {copyStatus === "copied" ? "Copied!" : copyStatus === "failed" ? "Failed to copy" : "Copy to Clipboard"}
+            </Button>
+            <div 
+              className="min-h-[300px] p-4 bg-card rounded-lg border font-mono overflow-auto"
+            >
+              <pre className="language-json">
+                <code>{output}</code>
+              </pre>
+            </div>
+          </div>
         </div>
+
+        <AnimatePresence>
+          {activePanel && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden w-full"
+            >
+              <div className="p-4 bg-card rounded-lg border">
+                {activePanel === "filter" && <FilterView onFilter={handleFilter} />}
+                {activePanel === "analyze" && analysis && <AnalysisView analysis={analysis} />}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

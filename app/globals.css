@@ -103,3 +103,137 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* Add these styles */
+pre[class*="language-"] {
+  margin: 0;
+  padding: 1rem;
+  background: transparent !important;
+}
+
+code[class*="language-"] {
+  font-family: ui-monospace, monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  tab-size: 2;
+  white-space: pre-wrap;
+  word-break: break-all;
+  word-wrap: break-word;
+}
+
+.line-numbers .line-numbers-rows {
+  padding: 1rem 0;
+}
+
+.line-highlight {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.token.tab,
+.token.space,
+.token.cr,
+.token.lf {
+  color: rgba(255, 255, 255, 0.2);
+}
+
+/* Add to your existing CSS */
+pre[contenteditable="true"] {
+  outline: none;
+  cursor: text;
+  white-space: pre-wrap;
+}
+
+pre[contenteditable="true"]:focus {
+  @apply ring-2 ring-ring ring-offset-2;
+}
+
+.error-highlight {
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+/* Style for invalid JSON */
+.invalid-json {
+  color: var(--destructive);
+}
+
+[contenteditable="true"]:focus {
+  outline: none;
+  @apply ring-2 ring-ring ring-offset-2;
+}
+
+/* Add to your existing CSS */
+textarea.json-input {
+  font-family: ui-monospace, monospace;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
+}
+
+textarea.json-input::placeholder {
+  color: hsl(var(--muted-foreground));
+  opacity: 0.7;
+}
+
+.line-numbers-rows {
+  border-right: 1px solid hsl(var(--border));
+  padding-right: 0.5em;
+}
+
+pre.language-json {
+  margin: 0;
+  padding: 0;
+  background: transparent !important;
+}
+
+pre.language-json code {
+  display: block;
+  white-space: pre;
+  word-spacing: normal;
+  word-break: normal;
+  tab-size: 2;
+  hyphens: none;
+  overflow-x: auto;
+  padding: 0;
+  margin: 0;
+  background: transparent !important;
+}
+
+.token.property { color: #9cdcfe !important; }
+.token.string { color: #ce9178 !important; }
+.token.number { color: #b5cea8 !important; }
+.token.boolean { color: #569cd6 !important; }
+.token.null { color: #569cd6 !important; }
+.token.punctuation { color: #d4d4d4 !important; }
+
+.dark pre.language-json {
+  color: #e5e5e5;
+}
+
+pre.language-json .token.property { color: #9cdcfe; }
+pre.language-json .token.string { color: #ce9178; }
+pre.language-json .token.number { color: #b5cea8; }
+pre.language-json .token.boolean { color: #569cd6; }
+pre.language-json .token.null { color: #569cd6; }
+pre.language-json .token.punctuation { color: #d4d4d4; }
+
+pre code.language-json {
+  display: block;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.dark pre code.language-json {
+  color: #e5e5e5;
+}
+
+pre code.language-json .token.property { color: #9cdcfe; }
+pre code.language-json .token.string { color: #ce9178; }
+pre code.language-json .token.number { color: #b5cea8; }
+pre code.language-json .token.boolean { color: #569cd6; }
+pre code.language-json .token.null { color: #569cd6; }
+pre code.language-json .token.punctuation { color: #d4d4d4; }
