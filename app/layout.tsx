@@ -4,7 +4,8 @@ import "./globals.css";
 import { Navbar } from "@/components/navbar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Footer } from "@/components/footer";
-import { ClerkThemeProvider } from "@/components/clerk-theme-provider";
+import { ClerkProvider } from "@clerk/nextjs";
+import { dark } from "@clerk/themes";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -35,13 +36,14 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable}`}>
       <body className='font-sans min-h-screen flex flex-col'>
         <ThemeProvider>
-          <ClerkThemeProvider>
+          <ClerkProvider
+            appearance={{
+              baseTheme: dark,
+            }}>
             <Navbar />
-            <main className="flex-1">
-              {children}
-            </main>
+            <main className='flex-1'>{children}</main>
             <Footer />
-          </ClerkThemeProvider>
+          </ClerkProvider>
         </ThemeProvider>
       </body>
     </html>
