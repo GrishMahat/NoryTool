@@ -38,7 +38,7 @@ export function Hero() {
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3, duration: 0.5 }}
       >
-        <Badge variant="secondary" className="text-sm mb-4">New Release v0.1</Badge>
+        <Badge variant="secondary" className="text-sm mb-4">New Release v0.2</Badge>
       </motion.div>
       <motion.p 
         className="mt-3 max-w-md mx-auto text-base text-muted-foreground sm:text-lg md:mt-5 md:text-xl md:max-w-3xl"
