@@ -110,4 +110,4 @@ export function AnalysisView({ analysis }: AnalysisViewProps) {
       </CardContent>
     </Card>
   );
-} 
+}

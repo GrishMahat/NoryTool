@@ -1,79 +1,89 @@
-/** @format */
-
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { copyToClipboard } from "@/lib/utils";
 import {
   FileCode,
-  Maximize2,
   Minimize2,
   Filter,
   Trash2,
   Search,
   Copy,
-  AlertCircle
+  AlertCircle,
+  Download,
+  Upload,
+  Code2,
+  FileJson,
+  Braces
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { JSONUtils, JSONAnalysis, FilterOptions } from "@/lib/jsonUtils";
-import Prism from 'prismjs';
-import 'prismjs/components/prism-json';
-import 'prismjs/plugins/line-numbers/prism-line-numbers';
-import 'prismjs/plugins/line-highlight/prism-line-highlight';
-import 'prismjs/plugins/show-invisibles/prism-show-invisibles';
-import 'prismjs/themes/prism-tomorrow.css';
-import 'prismjs/plugins/line-numbers/prism-line-numbers.css';
-import 'prismjs/plugins/line-highlight/prism-line-highlight.css';
 import { AnalysisView } from '@/components/json/analysis-view';
 import { FilterView } from '@/components/json/filter-view';
 import { motion, AnimatePresence } from "framer-motion";
+import Editor from "@monaco-editor/react";
+
+const sampleJson = {
+  name: "John Doe",
+  age: 30,
+  email: "john@example.com",
+  address: {
+    street: "123 Main St",
+    city: "Boston",
+    country: "USA"
+  },
+  hobbies: ["reading", "gaming", "coding"]
+};
+
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const debounce = <T extends (...args: any[]) => void>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void => {
+  let timeout: NodeJS.Timeout;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+};
+
+
+
 
 export default function JSONToolPage() {
   const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">(
-    "idle"
-  );
-  const [activeTab, setActiveTab] = useState<
-    "beautify" | "minify" | "filter" | "analyze"
-  >("beautify");
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
+  const [activeTab, setActiveTab] = useState<"beautify" | "minify" | "filter" | "analyze">("beautify");
   const [analysis, setAnalysis] = useState<JSONAnalysis | null>(null);
   const [activePanel, setActivePanel] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [fileSize, setFileSize] = useState(0);
+  
+  // Keep track of whether input is valid JSON
+  const isValidJSON = useRef(false);
 
-  const sampleJson = {
-    name: "John Doe",
-    age: 30,
-    email: "john@example.com",
-    address: {
-      street: "123 Main St",
-      city: "Boston",
-      country: "USA"
-    },
-    hobbies: ["reading", "gaming", "coding"]
-  };
+  // Add constants for file size limits
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+  const LARGE_FILE_SIZE = 1 * 1024 * 1024; // 1MB - threshold for lazy loading
 
   const handleFormat = useCallback(() => {
     try {
       const parsed = JSON.parse(input);
+      isValidJSON.current = true;
       const formatted = JSON.stringify(parsed, null, activeTab === "beautify" ? 2 : 0);
-      const highlighted = Prism.highlight(formatted, Prism.languages.json, 'json');
       setOutput(formatted);
-      
-      const outputElement = document.querySelector('pre.language-json code');
-      if (outputElement) {
-        outputElement.innerHTML = highlighted;
-      }
-
       setError(null);
       toast({
         title: "JSON formatted successfully",
         variant: "default"
       });
     } catch (err) {
+      isValidJSON.current = false;
       setError(err instanceof Error ? err.message : "Invalid JSON");
       setOutput(input);
       toast({
@@ -85,6 +95,7 @@ export default function JSONToolPage() {
   }, [input, activeTab]);
 
   const handleFilter = useCallback((options: FilterOptions) => {
+    if (!isValidJSON.current) return;
     try {
       const filtered = JSONUtils.filter(input, options);
       setOutput(filtered);
@@ -104,6 +115,7 @@ export default function JSONToolPage() {
   }, [input]);
 
   const handleAnalyze = useCallback(() => {
+    if (!isValidJSON.current) return;
     try {
       const result = JSONUtils.analyze(input);
       setAnalysis(result);
@@ -142,29 +154,67 @@ export default function JSONToolPage() {
     }
   };
 
+  const handleDownload = () => {
+    if (!output) return;
+    JSONUtils.downloadJSON(output, "formatted.json");
+    toast({
+      title: "JSON downloaded successfully",
+      variant: "default"
+    });
+  };
+
+  // Debounced handlers
+  const debouncedFormat = useCallback(
+    debounce(() => {
+      if (!input) return;
+      handleFormat();
+    }, 500),
+    [handleFormat]
+  );
+
+  const debouncedFilter = useCallback(
+    debounce((options: FilterOptions) => {
+      if (!input) return;
+      handleFilter(options);
+    }, 500),
+    [handleFilter]
+  );
+
+  const debouncedAnalyze = useCallback(
+    debounce(() => {
+      if (!input) return;
+      handleAnalyze();
+    }, 500),
+    [handleAnalyze]
+  );
+
   useEffect(() => {
     if (!input) return;
     
-    if (activeTab === "beautify" || activeTab === "minify") {
-      handleFormat();
-    } else if (activeTab === "filter") {
-      handleFilter({ path: "" });
-    } else if (activeTab === "analyze") {
-      handleAnalyze();
+    // First validate JSON
+    try {
+      JSON.parse(input);
+      isValidJSON.current = true;
+    } catch {
+      isValidJSON.current = false;
+      return;
     }
-  }, [input, activeTab, handleFormat, handleFilter, handleAnalyze]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      Prism.highlightAll();
-    }, 0);
-    return () => clearTimeout(timer);
-  }, [output]);
+    // Only process if JSON is valid
+    if (activeTab === "beautify" || activeTab === "minify") {
+      debouncedFormat();
+    } else if (activeTab === "filter") {
+      debouncedFilter({ path: "" });
+    } else if (activeTab === "analyze") {
+      debouncedAnalyze();
+    }
+  }, [input, activeTab, debouncedFormat, debouncedFilter, debouncedAnalyze]);
 
   const handleReset = () => {
     setInput("");
     setOutput("");
     setError(null);
+    isValidJSON.current = false;
     toast({
       title: "Reset successful",
       variant: "default"
@@ -176,102 +226,185 @@ export default function JSONToolPage() {
       setActivePanel(null);
     } else {
       setActivePanel(value);
-      if (value === "analyze") {
+      if (value === "analyze" && isValidJSON.current) {
         handleAnalyze();
       }
     }
     setActiveTab(value as "beautify" | "minify" | "filter" | "analyze");
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const text = e.target?.result as string;
+    if (!file) return;
+
+    // Check file size
+    if (file.size > MAX_FILE_SIZE) {
+      toast({
+        title: "File too large",
+        description: "Maximum file size is 10MB",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setFileSize(file.size);
+    setIsLoading(true);
+
+    try {
+      const text = await (file.size > LARGE_FILE_SIZE 
+        ? await readLargeFile(file)
+        : await file.text());
+
+      // Validate JSON
+      try {
+        JSON.parse(text); // Test if valid JSON
         setInput(text);
         toast({
-          title: "File uploaded successfully",
+          title: file.size > LARGE_FILE_SIZE 
+            ? "Large file loaded successfully"
+            : "File loaded successfully",
           variant: "default"
         });
-      };
-      reader.readAsText(file);
+      } catch {
+        throw new Error("Invalid JSON file");
+      }
+    } catch (err) {
+      toast({
+        title: "Error loading file",
+        description: err instanceof Error ? err.message : "Failed to load file",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
+  // Helper function to read large files
+  const readLargeFile = async (file: File): Promise<string> => {
+    const reader = new ReadableStreamDefaultReader(file.stream());
+    const chunks: Uint8Array[] = [];
+    
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) chunks.push(value);
+    }
+
+    const blob = new Blob(chunks, { type: 'application/json' });
+    return blob.text();
+  };
+
+  const handleEditorChange = (value: string | undefined) => {
+    setInput(value || "");
+  };
+
+  // Add loading indicator component
+  const LoadingOverlay = () => (
+    <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center">
+      <div className="space-y-4 text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <p className="text-sm text-muted-foreground">
+          Loading {(fileSize / 1024 / 1024).toFixed(2)}MB file...
+        </p>
+      </div>
+    </div>
+  );
+
   return (
-    <div className='container py-8 space-y-6'>
+    <div className='container mx-auto py-4 px-2 sm:px-4 space-y-4 max-w-7xl'>
       <div className='flex items-center gap-3'>
-        <FileCode className='w-8 h-8 text-primary' />
+        <FileCode className='w-6 h-6 sm:w-8 sm:h-8 text-primary' />
         <div>
-          <h1 className='text-2xl font-bold'>JSON Formatter</h1>
-          <p className='text-muted-foreground'>
-            Beautify, minify, and analyze JSON with syntax highlighting
+          <h1 className='text-xl sm:text-2xl font-bold'>JSON Formatter</h1>
+          <p className='text-sm sm:text-base text-muted-foreground'>
+            Professional JSON tools for developers
           </p>
         </div>
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 p-4 bg-destructive/15 text-destructive rounded-lg">
-          <AlertCircle className="w-4 h-4" />
+        <div className="flex items-center gap-2 p-3 sm:p-4 bg-destructive/15 text-destructive rounded-lg text-sm sm:text-base">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
           <p>{error}</p>
         </div>
       )}
 
       <div className='flex flex-col space-y-4'>
-        <div className='flex flex-col sm:flex-row gap-4 justify-between items-start'>
+        <div className='flex flex-col gap-4'>
           <Tabs
             value={activeTab}
             onValueChange={handleTabChange}
-            className='w-full sm:w-auto'>
-            <TabsList className='grid grid-cols-2 sm:grid-cols-4 w-full sm:w-auto'>
-              <TabsTrigger value='beautify'>Beautify</TabsTrigger>
-              <TabsTrigger value='minify'>Minify</TabsTrigger>
-              <TabsTrigger value='filter'>Filter</TabsTrigger>
-              <TabsTrigger value='analyze'>Analyze</TabsTrigger>
+            className='w-full'>
+            <TabsList className="w-full grid grid-cols-2 sm:flex sm:flex-wrap bg-transparent p-0 gap-2">
+              <TabsTrigger value='beautify' className="sm:flex-1 min-w-[100px]">
+                <Code2 className="w-4 h-4 mr-2" />
+                Beautify
+              </TabsTrigger>
+              <TabsTrigger value='minify' className="sm:flex-1 min-w-[100px]">
+                <Minimize2 className="w-4 h-4 mr-2" />
+                Minify
+              </TabsTrigger>
+              <TabsTrigger value='filter' className="sm:flex-1 min-w-[100px]">
+                <Filter className="w-4 h-4 mr-2" />
+                Filter
+              </TabsTrigger>
+              <TabsTrigger value='analyze' className="sm:flex-1 min-w-[100px]">
+                <Search className="w-4 h-4 mr-2" />
+                Analyze
+              </TabsTrigger>
             </TabsList>
           </Tabs>
 
-          <div className='flex gap-4 w-full sm:w-auto'>
-            <Button 
-              onClick={handleReset} 
+          <div className='grid grid-cols-2 gap-2 w-full sm:grid-cols-4'>
+            <Button
+              onClick={handleReset}
               variant='secondary'
-              className='flex-1 sm:flex-none'>
+              size="sm"
+              className='w-full sm:text-base'>
               <Trash2 className='w-4 h-4 mr-2' />
               Reset
             </Button>
-            <Button 
+            <Button
               onClick={handleFormat}
-              className='flex-1 sm:flex-none'>
-              {activeTab === "beautify" ? (
-                <Maximize2 className='w-4 h-4 mr-2' />
-              ) : activeTab === "minify" ? (
-                <Minimize2 className='w-4 h-4 mr-2' />
-              ) : activeTab === "filter" ? (
-                <Filter className='w-4 h-4 mr-2' />
-              ) : (
-                <Search className='w-4 h-4 mr-2' />
-              )}
-              {activeTab === "beautify"
-                ? "Beautify"
-                : activeTab === "minify"
-                ? "Minify"
-                : activeTab === "filter"
-                ? "Filter"
-                : "Analyze"}
+              size="sm"
+              className='w-full sm:text-base'>
+              <Braces className='w-4 h-4 mr-2' />
+              Format
+            </Button>
+            <Button
+              onClick={handleDownload}
+              variant="secondary"
+              size="sm"
+              className="w-full sm:text-base"
+              disabled={!output}>
+              <Download className="w-4 h-4 mr-2" />
+              Download
+            </Button>
+            <Button
+              onClick={handleCopy}
+              variant="secondary"
+              size="sm"
+              className="w-full sm:text-base"
+              disabled={!output}>
+              <Copy className="w-4 h-4 mr-2" />
+              {copyStatus === "copied" ? "Copied!" : "Copy"}
             </Button>
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2">
           <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <Button 
+            <div className="grid grid-cols-2 gap-2">
+              <Button
                 variant="secondary"
+                size="sm"
                 onClick={() => setInput(JSON.stringify(sampleJson, null, 2))}
+                className="w-full sm:text-base"
               >
-                Load Sample JSON
+                <FileJson className="w-4 h-4 mr-2" />
+                Load Sample
               </Button>
+
               <div className="relative">
                 <input
                   type="file"
@@ -280,38 +413,84 @@ export default function JSONToolPage() {
                   className="hidden"
                   id="json-upload"
                 />
-                <Button 
+                <Button
                   variant="secondary"
+                  size="sm"
                   onClick={() => document.getElementById('json-upload')?.click()}
+                  className="w-full sm:text-base"
                 >
-                  Upload JSON
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload
                 </Button>
               </div>
             </div>
-            <Textarea
-              placeholder={`Paste your JSON here...\n\nExample:\n{\n  "name": "John Doe",\n  "age": 30,\n  "email": "john@example.com"\n}`}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              className="min-h-[300px] font-mono"
-            />
-          </div>
-          <div className="space-y-4">
-            <Button
-              variant="secondary"
-              onClick={handleCopy}
-              className="w-full"
-              disabled={!output}
-            >
-              <Copy className="w-4 h-4 mr-2" />
-              {copyStatus === "copied" ? "Copied!" : copyStatus === "failed" ? "Failed to copy" : "Copy to Clipboard"}
-            </Button>
-            <div 
-              className="min-h-[300px] p-4 bg-card rounded-lg border font-mono overflow-auto"
-            >
-              <pre className="language-json">
-                <code>{output}</code>
-              </pre>
+
+            <div className="relative h-[500px] rounded-md border overflow-hidden">
+              {isLoading && <LoadingOverlay />}
+              <Suspense fallback={<LoadingOverlay />}>
+                <Editor
+                  height="100%"
+                  defaultLanguage="json"
+                  value={input}
+                  onChange={handleEditorChange}
+                  theme="vs-dark"
+                  options={{
+                    minimap: { enabled: false },
+                    fontSize: 14,
+                    lineNumbers: "on",
+                    scrollBeyondLastLine: false,
+                    wordWrap: "on",
+                    wrappingIndent: "same",
+                    formatOnPaste: true,
+                    formatOnType: true,
+                    automaticLayout: true,
+                    tabSize: 2,
+                    renderWhitespace: "selection",
+                    maxTokenizationLineLength: 20000,
+                    largeFileOptimizations: true,
+                    renderValidationDecorations: "on",
+                    folding: true,
+                    foldingStrategy: "indentation",
+                    scrollbar: {
+                      vertical: 'visible',
+                      horizontal: 'visible'
+                    }
+                  }}
+                  onValidate={(markers) => {
+                    if (markers.length > 0) {
+                      setError(markers[0].message);
+                    } else {
+                      setError(null);
+                    }
+                  }}
+                />
+              </Suspense>
             </div>
+          </div>
+
+          <div className="h-[500px] rounded-md border overflow-hidden">
+            <Editor
+              height="100%"
+              defaultLanguage="json"
+              value={output}
+              theme="vs-dark"
+              options={{
+                readOnly: true,
+                minimap: { enabled: false },
+                fontSize: 14,
+                lineNumbers: "on",
+                scrollBeyondLastLine: false,
+                wordWrap: "on",
+                wrappingIndent: "same",
+                automaticLayout: true,
+                tabSize: 2,
+                renderWhitespace: "selection",
+                scrollbar: {
+                  vertical: 'visible',
+                  horizontal: 'visible'
+                }
+              }}
+            />
           </div>
         </div>
 
@@ -334,4 +513,4 @@ export default function JSONToolPage() {
       </div>
     </div>
   );
-}
+};

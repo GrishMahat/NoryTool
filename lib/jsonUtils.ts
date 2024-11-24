@@ -1,13 +1,6 @@
 /** @format */
 
-import Prism from 'prismjs';
-import 'prismjs/components/prism-json';
-import 'prismjs/plugins/line-numbers/prism-line-numbers';
-import 'prismjs/plugins/line-highlight/prism-line-highlight';
-import 'prismjs/plugins/show-invisibles/prism-show-invisibles';
-import 'prismjs/themes/prism-tomorrow.css';
-import 'prismjs/plugins/line-numbers/prism-line-numbers.css';
-import 'prismjs/plugins/line-highlight/prism-line-highlight.css';
+
 
 export interface JSONAnalysis {
   summary: {
@@ -82,20 +75,26 @@ export interface FilterOptions {
   conditions?: Array<{
     key?: string;
     value?: string | number | boolean | null;
-    type?: 'string' | 'number' | 'boolean' | 'null' | 'object' | 'array';
-    operator?: 'equals' | 'contains' | 'startsWith' | 'endsWith' | 'gt' | 'lt' | 'gte' | 'lte';
+    type?: "string" | "number" | "boolean" | "null" | "object" | "array";
+    operator?:
+      | "equals"
+      | "contains"
+      | "startsWith"
+      | "endsWith"
+      | "gt"
+      | "lt"
+      | "gte"
+      | "lte";
   }>;
   limit?: number;
   exclude?: string[];
 }
 
 export class JSONUtils {
-  static format(json: string, indent: number = 2, options = {
-    highlight: true,
-    lineNumbers: true,
-    showInvisibles: false,
-    highlightLines: '',
-  }): { formatted: string; error?: string } {
+  static format(
+    json: string,
+    indent: number = 2,
+  ): { formatted: string; error?: string } {
     const validation = this.validate(json);
     if (!validation.isValid) {
       return { formatted: json, error: validation.error };
@@ -104,25 +103,11 @@ export class JSONUtils {
     try {
       const parsed = JSON.parse(json);
       const formatted = JSON.stringify(parsed, null, indent);
-      
-      if (!options.highlight) {
-        return { formatted };
-      }
-
-      // Initialize plugins
-      if (options.lineNumbers) {
-        Prism.plugins.lineNumbers.init();
-      }
-      if (options.showInvisibles) {
-        Prism.plugins.showInvisibles.init();
-      }
-
-      const highlighted = Prism.highlight(formatted, Prism.languages.json, 'json');
-      return { formatted: highlighted };
+      return { formatted };
     } catch (error) {
-      return { 
-        formatted: json, 
-        error: error instanceof Error ? error.message : "Formatting failed" 
+      return {
+        formatted: json,
+        error: error instanceof Error ? error.message : "Formatting failed",
       };
     }
   }
@@ -189,7 +174,7 @@ export class JSONUtils {
               averageLength: 0,
               empty: 0,
               min: Infinity,
-              max: -Infinity
+              max: -Infinity,
             },
             numbers: {
               count: 0,
@@ -211,13 +196,13 @@ export class JSONUtils {
             nulls: 0,
           },
           paths: {
-            longest: '',
+            longest: "",
             deepest: [],
             all: [],
-          }
+          },
         },
         paths: {
-          longest: '',
+          longest: "",
           deepest: [],
           all: [],
         },
@@ -240,8 +225,9 @@ export class JSONUtils {
             node.length
           );
           analysis.structure.arrays.totalItems += node.length;
-          analysis.structure.arrays.averageLength = 
-            analysis.structure.arrays.totalItems / analysis.structure.arrays.count;
+          analysis.structure.arrays.averageLength =
+            analysis.structure.arrays.totalItems /
+            analysis.structure.arrays.count;
           node.forEach((item) => analyzeNode(item, depth + 1));
         } else if (typeof node === "object" && node !== null) {
           analysis.structure.objects.count++;
@@ -249,17 +235,19 @@ export class JSONUtils {
             analysis.structure.objects.maxNesting,
             depth
           );
-          analysis.structure.objects.averageKeys = 
+          analysis.structure.objects.averageKeys =
             totalKeys / analysis.structure.objects.count;
           const keys = Object.keys(node);
           analysis.summary.totalKeys += keys.length;
 
-          keys.forEach(key => {
+          keys.forEach((key) => {
             totalKeyLength += key.length;
             totalKeys++;
-            
-            if (!analysis.structure.paths.longest || 
-                key.length > analysis.structure.paths.longest.length) {
+
+            if (
+              !analysis.structure.paths.longest ||
+              key.length > analysis.structure.paths.longest.length
+            ) {
               analysis.structure.paths.longest = key;
             }
             analysis.structure.paths.deepest.push(key);
@@ -271,20 +259,28 @@ export class JSONUtils {
           const type = typeof node;
           analysis.summary.totalKeys++;
 
-          if (type === 'string' && typeof node === 'string') {
+          if (type === "string" && typeof node === "string") {
             totalStringLength += node.length;
             totalStrings++;
-            analysis.structure.values.strings.min = 
-              Math.min(analysis.structure.values.strings.min, node.length);
-            analysis.structure.values.strings.max = 
-              Math.max(analysis.structure.values.strings.max, node.length);
-          } else if (type === 'number' && typeof node === 'number') {
+            analysis.structure.values.strings.min = Math.min(
+              analysis.structure.values.strings.min,
+              node.length
+            );
+            analysis.structure.values.strings.max = Math.max(
+              analysis.structure.values.strings.max,
+              node.length
+            );
+          } else if (type === "number" && typeof node === "number") {
             totalNumbers++;
             numberSum += node;
-            analysis.structure.values.numbers.min = 
-              Math.min(analysis.structure.values.numbers.min, node);
-            analysis.structure.values.numbers.max = 
-              Math.max(analysis.structure.values.numbers.max, node);
+            analysis.structure.values.numbers.min = Math.min(
+              analysis.structure.values.numbers.min,
+              node
+            );
+            analysis.structure.values.numbers.max = Math.max(
+              analysis.structure.values.numbers.max,
+              node
+            );
           }
         }
       };
@@ -293,10 +289,12 @@ export class JSONUtils {
 
       // Calculate averages
       analysis.summary.totalKeys = totalKeys ? totalKeyLength / totalKeys : 0;
-      analysis.structure.values.strings.averageLength = 
-        totalStrings ? totalStringLength / totalStrings : 0;
-      analysis.structure.values.numbers.stats.average = 
-        totalNumbers ? numberSum / totalNumbers : 0;
+      analysis.structure.values.strings.averageLength = totalStrings
+        ? totalStringLength / totalStrings
+        : 0;
+      analysis.structure.values.numbers.stats.average = totalNumbers
+        ? numberSum / totalNumbers
+        : 0;
 
       return analysis;
     } catch {
@@ -309,9 +307,9 @@ export class JSONUtils {
       JSON.parse(json);
       return { isValid: true };
     } catch (error) {
-      return { 
-        isValid: false, 
-        error: error instanceof Error ? error.message : "Invalid JSON format" 
+      return {
+        isValid: false,
+        error: error instanceof Error ? error.message : "Invalid JSON format",
       };
     }
   }
@@ -331,7 +329,7 @@ export class JSONUtils {
   static filter(json: string, options: FilterOptions = {}): string {
     try {
       let result = JSON.parse(json);
-      
+
       // Apply path filter if specified
       if (options.path) {
         const paths = options.path.split(".");
@@ -346,29 +344,29 @@ export class JSONUtils {
 
       // Apply search query if specified
       if (options.query) {
-        const searchQuery = options.caseSensitive ? 
-          options.query : 
-          options.query.toLowerCase();
+        const searchQuery = options.caseSensitive
+          ? options.query
+          : options.query.toLowerCase();
 
         const filterByQuery = (obj: unknown, depth = 0): unknown => {
           if (options.maxDepth && depth > options.maxDepth) return null;
 
           if (Array.isArray(obj)) {
             const filtered = obj
-              .map(item => filterByQuery(item, depth + 1))
-              .filter(item => item !== null);
+              .map((item) => filterByQuery(item, depth + 1))
+              .filter((item) => item !== null);
             return filtered.length ? filtered : null;
           }
 
-          if (typeof obj === 'object' && obj !== null) {
+          if (typeof obj === "object" && obj !== null) {
             const filtered: Record<string, unknown> = {};
             let hasMatch = false;
 
             for (const [key, value] of Object.entries(obj)) {
               const valueStr = String(value);
-              const matchesQuery = options.caseSensitive ?
-                valueStr.includes(searchQuery) :
-                valueStr.toLowerCase().includes(searchQuery);
+              const matchesQuery = options.caseSensitive
+                ? valueStr.includes(searchQuery)
+                : valueStr.toLowerCase().includes(searchQuery);
 
               if (matchesQuery) {
                 filtered[key] = value;
@@ -386,9 +384,13 @@ export class JSONUtils {
           }
 
           const stringValue = String(obj);
-          return options.caseSensitive ?
-            stringValue.includes(searchQuery) ? obj : null :
-            stringValue.toLowerCase().includes(searchQuery) ? obj : null;
+          return options.caseSensitive
+            ? stringValue.includes(searchQuery)
+              ? obj
+              : null
+            : stringValue.toLowerCase().includes(searchQuery)
+            ? obj
+            : null;
         };
 
         result = filterByQuery(result) ?? {};
@@ -401,21 +403,24 @@ export class JSONUtils {
 
           if (Array.isArray(obj)) {
             const filtered = obj
-              .map(item => filterByConditions(item, depth + 1))
-              .filter(item => item !== null);
+              .map((item) => filterByConditions(item, depth + 1))
+              .filter((item) => item !== null);
             return filtered.length ? filtered : null;
           }
 
-          if (typeof obj === 'object' && obj !== null) {
+          if (typeof obj === "object" && obj !== null) {
             const filtered: Record<string, unknown> = {};
             let hasMatch = false;
 
             for (const [key, value] of Object.entries(obj)) {
               const condition = options.conditions?.[0];
-              const matchesCondition = condition && typeof value === typeof condition.value && 
-                (options.caseSensitive ?
-                  value === condition.value :
-                  String(value).toLowerCase() === String(condition.value).toLowerCase());
+              const matchesCondition =
+                condition &&
+                typeof value === typeof condition.value &&
+                (options.caseSensitive
+                  ? value === condition.value
+                  : String(value).toLowerCase() ===
+                    String(condition.value).toLowerCase());
 
               if (matchesCondition) {
                 filtered[key] = value;
@@ -433,11 +438,14 @@ export class JSONUtils {
           }
 
           const condition = options.conditions?.[0];
-          return condition && typeof obj === typeof condition.value && (
-            options.caseSensitive ?
-              obj === condition.value :
-              String(obj).toLowerCase() === String(condition.value).toLowerCase()
-          ) ? obj : null;
+          return condition &&
+            typeof obj === typeof condition.value &&
+            (options.caseSensitive
+              ? obj === condition.value
+              : String(obj).toLowerCase() ===
+                String(condition.value).toLowerCase())
+            ? obj
+            : null;
         };
 
         result = filterByConditions(result) ?? {};
@@ -452,11 +460,11 @@ export class JSONUtils {
 
       // Apply exclude if specified
       if (options.exclude) {
-        const exclude = options.exclude.map(key => key.toLowerCase());
+        const exclude = options.exclude.map((key) => key.toLowerCase());
         const filtered: Record<string, unknown> = {};
         Object.keys(result)
-          .filter(key => !exclude.includes(key.toLowerCase()))
-          .forEach(key => {
+          .filter((key) => !exclude.includes(key.toLowerCase()))
+          .forEach((key) => {
             filtered[key] = (result as Record<string, unknown>)[key];
           });
         result = filtered;
@@ -464,7 +472,11 @@ export class JSONUtils {
 
       return JSON.stringify(result, null, 2);
     } catch (error) {
-      throw new Error(error instanceof Error ? error.message : "Invalid JSON or filter options");
+      throw new Error(
+        error instanceof Error
+          ? error.message
+          : "Invalid JSON or filter options"
+      );
     }
   }
 }
