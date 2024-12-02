@@ -5,7 +5,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Code2, KeyRound, FileJson, Search } from "lucide-react";
+import { Code2, KeyRound, FileJson, Search, FilterIcon } from "lucide-react";
 import {
   Card,
   CardHeader,
@@ -35,7 +35,7 @@ const tools = [
     color: "text-secondary",
     bgColor: "bg-secondary/10",
     href: "/tools/uuid",
-    badge: "New",
+    badge: "bad",
   },
   {
     id: "base64",
@@ -45,6 +45,17 @@ const tools = [
     color: "text-accent",
     bgColor: "bg-accent/10",
     href: "/tools/base64",
+    badge: "Decent",
+  },
+  {
+    id: "css-filt",
+    name: "CSS Filters",
+    description: "Apply and customize CSS filters to images",
+    icon: FilterIcon,
+    color: "text-accent", 
+    bgColor: "bg-accent/10", 
+    href: "/tools/css-filt", 
+    badge: "New", 
   },
 ];
 
