@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Accordion } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import TextCustomizer from "@/components/textbehindimage/editor/text-customizer";
+import TextCustomizer from "@/components/textbehindimage/text-customizer";
 import { removeBackground } from "@imgly/background-removal";
 
 import { PlusIcon, ReloadIcon } from "@radix-ui/react-icons";
@@ -31,8 +31,8 @@ import { PlusIcon, ReloadIcon } from "@radix-ui/react-icons";
 //   loading: () => null,
 // });
 
-
 import "@/app/fonts.css";
+
 
 const Page = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -55,26 +55,32 @@ const Page = () => {
   ) => {
     const file = event.target.files?.[0];
     if (file) {
-      const imageUrl = URL.createObjectURL(file);
-      setSelectedImage(imageUrl);
-      await setupImage(imageUrl);
+      try {
+        const imageUrl = URL.createObjectURL(file);
+        setSelectedImage(imageUrl);
+        await setupImage(file); // Pass the file directly instead of URL
+      } catch (error) {
+        console.error("Error handling file:", error);
+      }
     }
   };
 
+  const setupImage = async (file: File) => {
+    try {
+      console.log("Starting background removal");
 
+      // Use the file directly instead of fetching it
+      const imageBlob = await removeBackground(file);
+      console.log("Background removed successfully:", imageBlob);
 
-const setupImage = async (imageUrl: string) => {
-  try {
-            const imageBlob = await removeBackground(imageUrl);
-            const url = URL.createObjectURL(imageBlob);
-            setRemovedBgImageUrl(url);
-            setIsImageSetupDone(true);
-
-
-  } catch (error) {
-    console.error("Error setting up image:", error);
-  }
-};
+      const url = URL.createObjectURL(imageBlob);
+      console.log("Generated URL:", url);
+      setRemovedBgImageUrl(url);
+      setIsImageSetupDone(true);
+    } catch (error) {
+      console.error("Error during background removal:", error);
+    }
+  };
 
   const addNewTextSet = () => {
     const newId = Math.max(...textSets.map((set) => set.id), 0) + 1;

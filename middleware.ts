@@ -1,45 +1,44 @@
-/** @format */
-
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-// Define public routes that don't require authentication
 const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/",
-  "/terms",  
+  "/terms",
   "/privacy",
   "/tools/json(.*)",
   "/tools/uuid",
   "/tools/base64",
   "/tools/css-filt",
-  "/tools/text"
+  "/tools/text",
 ]);
 
-// Define protected routes that always require authentication
 const isProtectedRoute = createRouteMatcher([
-  "/dashboard(.*)", 
+  "/dashboard(.*)",
   "/forum(.*)",
-  // "/tools(.*)"     // Added tools route based on your original issue
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
-  // Check if the current route is protected
   const isProtected = isProtectedRoute(request);
   const isPublic = isPublicRoute(request);
 
-  if (isProtected || (!isPublic && !request.url.includes('_next'))) {
-    // Protect all routes except public ones
+  console.log("Middleware check for URL:", request.url);
+
+  if (isProtected || (!isPublic && !request.url.includes('_next') && !request.url.startsWith("blob:"))) {
+    console.log("Authenticating request...");
     await auth.protect();
+  } else {
+    console.log("Request allowed without authentication.");
   }
 });
 
 export const config = {
   matcher: [
-    // Skip Next.js internals and static files
-    "/((?!_next/static|_next/image|favicon.ico).*)",
-    
-    // Always run for API routes
-    "/(api|trpc)(.*)",
+    // Target protected API and specific routes
+    "/(api|dashboard|forum|tools)(.*)",
+    // Exclude static files and `_next` internals
+    "/(_next/static/:path*)",
+    "/(_next/image/:path*)", 
+    "/(favicon.ico)",
   ],
 };
