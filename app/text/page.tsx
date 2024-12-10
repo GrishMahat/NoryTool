@@ -14,12 +14,22 @@ import TextCustomizer from "@/components/textbehindimage/editor/text-customizer"
 
 import { PlusIcon, ReloadIcon } from "@radix-ui/react-icons";
 
-// Replace the direct import with:
-const backgroundRemoval = dynamic(
-  () =>
-    import("@imgly/background-removal").then((mod) => mod.backgroundRemoval),
-  { ssr: false }
-);
+// const BackgroundRemoval = dynamic(
+//   () =>
+//     import("@imgly/background-removal").then((mod) => {
+//       // Explicitly return a component-like structure
+//       return () => null;
+//     }),
+//   {
+//     ssr: false,
+//   }
+// );
+
+// const BackgroundRemoval = dynamic(() => Promise.resolve(() => null), {
+//   ssr: false,
+//   loading: () => null,
+// });
+
 
 import "@/app/fonts.css";
 
@@ -52,7 +62,10 @@ const Page = () => {
 
   const setupImage = async (imageUrl: string) => {
     try {
-      const imageBlob = await backgroundRemoval(imageUrl);
+      const { removeBackground } = await import(
+            "@imgly/background-removal"
+          );
+      const imageBlob = await removeBackground(imageUrl);
       const url = URL.createObjectURL(imageBlob);
       setRemovedBgImageUrl(url);
       setIsImageSetupDone(true);
