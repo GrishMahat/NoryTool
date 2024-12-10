@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Accordion } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import TextCustomizer from "@/components/textbehindimage/editor/text-customizer";
+import { removeBackground } from "@imgly/background-removal";
 
 import { PlusIcon, ReloadIcon } from "@radix-ui/react-icons";
 
@@ -60,19 +61,21 @@ const Page = () => {
     }
   };
 
-  const setupImage = async (imageUrl: string) => {
-    try {
-      const { removeBackground } = await import(
-            "@imgly/background-removal"
-          );
-      const imageBlob = await removeBackground(imageUrl);
-      const url = URL.createObjectURL(imageBlob);
-      setRemovedBgImageUrl(url);
-      setIsImageSetupDone(true);
-    } catch (error) {
-      console.error(error);
-    }
-  };
+
+
+const setupImage = async (imageUrl: string) => {
+  try {
+    const bgRemoval = await import("@imgly/background-removal");
+            const imageBlob = await removeBackground(imageUrl);
+            const url = URL.createObjectURL(imageBlob);
+            setRemovedBgImageUrl(url);
+            setIsImageSetupDone(true);
+
+
+  } catch (error) {
+    console.error("Error setting up image:", error);
+  }
+};
 
   const addNewTextSet = () => {
     const newId = Math.max(...textSets.map((set) => set.id), 0) + 1;
