@@ -13,7 +13,7 @@ const isPublicRoute = createRouteMatcher([
   "/tools/uuid",
   "/tools/base64",
   "/tools/css-filt",
-  "text"
+  "/tools/text"
 ]);
 
 // Define protected routes that always require authentication
