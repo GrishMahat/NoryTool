@@ -4,7 +4,7 @@
 
 import React, { useRef, useState } from "react";
 import Image from "next/image";
-import dynamic from "next/dynamic";
+// import dynamic from "next/dynamic";
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -65,7 +65,6 @@ const Page = () => {
 
 const setupImage = async (imageUrl: string) => {
   try {
-    const bgRemoval = await import("@imgly/background-removal");
             const imageBlob = await removeBackground(imageUrl);
             const url = URL.createObjectURL(imageBlob);
             setRemovedBgImageUrl(url);

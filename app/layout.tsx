@@ -6,7 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Footer } from "@/components/footer";
 import { ClerkProvider } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
-import { Metadata } from 'next'
+import { Metadata } from "next";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -22,11 +22,17 @@ const geistMono = localFont({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Norytools',
-    template: `%s | 'nory tools'`
+    default: "Norytools",
+    template: `%s | 'nory tools'`,
   },
   description: "Made by a random guy who is having fun making this too.",
-  keywords: ["developer tools", "web tools", "json", "formatting", "validation"],
+  keywords: [
+    "developer tools",
+    "web tools",
+    "json",
+    "formatting",
+    "validation",
+  ],
   authors: [{ name: "Norysigth" }],
   creator: "Norysigth",
   openGraph: {
@@ -41,9 +47,9 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "nory tools",
     description: "Made by a random guy who is having fun making this too.",
-    creator: "@norysight"
+    creator: "@norysight",
   },
-}
+};
 
 export default function RootLayout({
   children,
@@ -57,6 +63,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable}`}>
       <body className='font-sans min-h-screen flex flex-col'>
         <ThemeProvider>
+          {/* @ts-expect-error Async Server Component */}
           <ClerkProvider
             appearance={{
               baseTheme: dark,
