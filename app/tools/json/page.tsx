@@ -39,16 +39,16 @@ const sampleJson = {
 
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const debounce = <T extends (...args: any[]) => void>(
-  func: T,
-  wait: number
-): (...args: Parameters<T>) => void => {
-  let timeout: NodeJS.Timeout;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
-  };
-};
+// const debounce = <T extends (...args: any[]) => void>(
+//   func: T,
+//   wait: number
+// ): (...args: Parameters<T>) => void => {
+//   let timeout: NodeJS.Timeout;
+//   return (...args: Parameters<T>) => {
+//     clearTimeout(timeout);
+//     timeout = setTimeout(() => func(...args), wait);
+//   };
+// };
 
 
 
@@ -165,27 +165,27 @@ export default function JSONToolPage() {
 
   // Debounced handlers
   const debouncedFormat = useCallback(
-    debounce(() => {
+    () => {
       if (!input) return;
       handleFormat();
-    }, 500),
-    [handleFormat]
+    },
+    [handleFormat, input]
   );
 
   const debouncedFilter = useCallback(
-    debounce((options: FilterOptions) => {
+    (options: FilterOptions) => {
       if (!input) return;
       handleFilter(options);
-    }, 500),
-    [handleFilter]
+    },
+    [handleFilter, input]
   );
 
   const debouncedAnalyze = useCallback(
-    debounce(() => {
+    () => {
       if (!input) return;
       handleAnalyze();
-    }, 500),
-    [handleAnalyze]
+    },
+    [handleAnalyze, input]
   );
 
   useEffect(() => {
@@ -311,205 +311,235 @@ export default function JSONToolPage() {
   );
 
   return (
-    <div className='container mx-auto py-4 px-2 sm:px-4 space-y-4 max-w-7xl'>
-      <div className='flex items-center gap-3'>
-        <FileCode className='w-6 h-6 sm:w-8 sm:h-8 text-primary' />
-        <div>
-          <h1 className='text-xl sm:text-2xl font-bold'>JSON Formatter</h1>
-          <p className='text-sm sm:text-base text-muted-foreground'>
-            Professional JSON tools for developers
-          </p>
-        </div>
-      </div>
-
-      {error && (
-        <div className="flex items-center gap-2 p-3 sm:p-4 bg-destructive/15 text-destructive rounded-lg text-sm sm:text-base">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          <p>{error}</p>
-        </div>
-      )}
-
-      <div className='flex flex-col space-y-4'>
-        <div className='flex flex-col gap-4'>
-          <Tabs
-            value={activeTab}
-            onValueChange={handleTabChange}
-            className='w-full'>
-            <TabsList className="w-full grid grid-cols-2 sm:flex sm:flex-wrap bg-transparent p-0 gap-2">
-              <TabsTrigger value='beautify' className="sm:flex-1 min-w-[100px]">
-                <Code2 className="w-4 h-4 mr-2" />
-                Beautify
-              </TabsTrigger>
-              <TabsTrigger value='minify' className="sm:flex-1 min-w-[100px]">
-                <Minimize2 className="w-4 h-4 mr-2" />
-                Minify
-              </TabsTrigger>
-              <TabsTrigger value='filter' className="sm:flex-1 min-w-[100px]">
-                <Filter className="w-4 h-4 mr-2" />
-                Filter
-              </TabsTrigger>
-              <TabsTrigger value='analyze' className="sm:flex-1 min-w-[100px]">
-                <Search className="w-4 h-4 mr-2" />
-                Analyze
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          <div className='grid grid-cols-2 gap-2 w-full sm:grid-cols-4'>
-            <Button
-              onClick={handleReset}
-              variant='secondary'
-              size="sm"
-              className='w-full sm:text-base'>
-              <Trash2 className='w-4 h-4 mr-2' />
-              Reset
-            </Button>
-            <Button
-              onClick={handleFormat}
-              size="sm"
-              className='w-full sm:text-base'>
-              <Braces className='w-4 h-4 mr-2' />
-              Format
-            </Button>
-            <Button
-              onClick={handleDownload}
-              variant="secondary"
-              size="sm"
-              className="w-full sm:text-base"
-              disabled={!output}>
-              <Download className="w-4 h-4 mr-2" />
-              Download
-            </Button>
-            <Button
-              onClick={handleCopy}
-              variant="secondary"
-              size="sm"
-              className="w-full sm:text-base"
-              disabled={!output}>
-              <Copy className="w-4 h-4 mr-2" />
-              {copyStatus === "copied" ? "Copied!" : "Copy"}
-            </Button>
+    <div className='min-h-screen bg-gradient-to-b from-background to-background/80'>
+      <div className='container mx-auto py-8 px-4 space-y-6 max-w-7xl'>
+        {/* Header Section */}
+        <div className='flex items-center gap-4 bg-card p-6 rounded-lg shadow-lg border border-border/50'>
+          <div className='p-3 bg-primary/10 rounded-full'>
+            <FileCode className='w-8 h-8 sm:w-10 sm:h-10 text-primary' />
+          </div>
+          <div>
+            <h1 className='text-2xl sm:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70'>
+              JSON Tools
+            </h1>
+            <p className='text-sm sm:text-base text-muted-foreground'>
+              Professional JSON formatter, analyzer and manipulation tools
+            </p>
           </div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-2">
+        {/* Error Display */}
+        {error && (
+          <div className='flex items-center gap-3 p-4 bg-destructive/10 text-destructive rounded-lg border border-destructive/20'>
+            <AlertCircle className='w-5 h-5 flex-shrink-0' />
+            <p className='text-sm font-medium'>{error}</p>
+          </div>
+        )}
+
+        <div className='space-y-6'>
+          {/* Tools Navigation */}
+          <div className='flex flex-col gap-4 bg-card p-6 rounded-lg border shadow-sm'>
+            <Tabs
+              value={activeTab}
+              onValueChange={handleTabChange}
+              className='w-full'>
+              <TabsList className='grid w-full grid-cols-2 sm:flex sm:flex-wrap gap-2 bg-transparent p-0'>
+                <TabsTrigger
+                  value='beautify'
+                  className='data-[state=active]:bg-primary data-[state=active]:text-primary-foreground sm:flex-1 min-w-[120px] transition-all'>
+                  <Code2 className='w-4 h-4 mr-2' />
+                  Beautify
+                </TabsTrigger>
+                <TabsTrigger
+                  value='minify'
+                  className='data-[state=active]:bg-primary data-[state=active]:text-primary-foreground sm:flex-1 min-w-[120px] transition-all'>
+                  <Minimize2 className='w-4 h-4 mr-2' />
+                  Minify
+                </TabsTrigger>
+                <TabsTrigger
+                  value='filter'
+                  className='data-[state=active]:bg-primary data-[state=active]:text-primary-foreground sm:flex-1 min-w-[120px] transition-all'>
+                  <Filter className='w-4 h-4 mr-2' />
+                  Filter
+                </TabsTrigger>
+                <TabsTrigger
+                  value='analyze'
+                  className='data-[state=active]:bg-primary data-[state=active]:text-primary-foreground sm:flex-1 min-w-[120px] transition-all'>
+                  <Search className='w-4 h-4 mr-2' />
+                  Analyze
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            {/* Action Buttons */}
+            <div className='grid grid-cols-2 sm:grid-cols-4 gap-3'>
               <Button
-                variant="secondary"
-                size="sm"
+                onClick={handleReset}
+                variant='secondary'
+                size='sm'
+                className='w-full group hover:bg-destructive hover:text-destructive-foreground transition-colors'>
+                <Trash2 className='w-4 h-4 mr-2 group-hover:animate-shake' />
+                Reset
+              </Button>
+              <Button
+                onClick={handleFormat}
+                size='sm'
+                className='w-full group hover:bg-primary/90'>
+                <Braces className='w-4 h-4 mr-2 group-hover:animate-pulse' />
+                Format
+              </Button>
+              <Button
+                onClick={handleDownload}
+                variant='secondary'
+                size='sm'
+                className='w-full group'
+                disabled={!output}>
+                <Download className='w-4 h-4 mr-2 group-hover:animate-bounce' />
+                Download
+              </Button>
+              <Button
+                onClick={handleCopy}
+                variant='secondary'
+                size='sm'
+                className='w-full group'
+                disabled={!output}>
+                <Copy className='w-4 h-4 mr-2 group-hover:scale-110 transition-transform' />
+                {copyStatus === "copied" ? "Copied!" : "Copy"}
+              </Button>
+            </div>
+
+            {/* Sample and Upload */}
+            <div className='grid grid-cols-2 gap-3'>
+              <Button
+                variant='secondary'
+                size='sm'
                 onClick={() => setInput(JSON.stringify(sampleJson, null, 2))}
-                className="w-full sm:text-base"
-              >
-                <FileJson className="w-4 h-4 mr-2" />
+                className='w-full group hover:border-primary/50'>
+                <FileJson className='w-4 h-4 mr-2 text-primary group-hover:animate-pulse' />
                 Load Sample
               </Button>
 
-              <div className="relative">
+              <div className='relative'>
                 <input
-                  type="file"
-                  accept=".json"
+                  type='file'
+                  accept='.json'
                   onChange={handleFileUpload}
-                  className="hidden"
-                  id="json-upload"
+                  className='hidden'
+                  id='json-upload'
                 />
                 <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => document.getElementById('json-upload')?.click()}
-                  className="w-full sm:text-base"
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  Upload
+                  variant='secondary'
+                  size='sm'
+                  onClick={() =>
+                    document.getElementById("json-upload")?.click()
+                  }
+                  className='w-full group hover:border-primary/50'>
+                  <Upload className='w-4 h-4 mr-2 text-primary group-hover:animate-bounce' />
+                  Upload JSON
                 </Button>
               </div>
             </div>
+          </div>
 
-            <div className="relative h-[500px] rounded-md border overflow-hidden">
-              {isLoading && <LoadingOverlay />}
-              <Suspense fallback={<LoadingOverlay />}>
-                <Editor
-                  height="100%"
-                  defaultLanguage="json"
-                  value={input}
-                  onChange={handleEditorChange}
-                  theme="vs-dark"
-                  options={{
-                    minimap: { enabled: false },
-                    fontSize: 14,
-                    lineNumbers: "on",
-                    scrollBeyondLastLine: false,
-                    wordWrap: "on",
-                    wrappingIndent: "same",
-                    formatOnPaste: true,
-                    formatOnType: true,
-                    automaticLayout: true,
-                    tabSize: 2,
-                    renderWhitespace: "selection",
-                    maxTokenizationLineLength: 20000,
-                    largeFileOptimizations: true,
-                    renderValidationDecorations: "on",
-                    folding: true,
-                    foldingStrategy: "indentation",
-                    scrollbar: {
-                      vertical: 'visible',
-                      horizontal: 'visible'
-                    }
-                  }}
-                  onValidate={(markers) => {
-                    if (markers.length > 0) {
-                      setError(markers[0].message);
-                    } else {
-                      setError(null);
-                    }
-                  }}
-                />
-              </Suspense>
+          {/* Editor Section */}
+          <div className='grid gap-6 lg:grid-cols-2'>
+            <div className='space-y-4'>
+              <div className='relative h-[600px] rounded-lg border overflow-hidden shadow-sm bg-card'>
+                {isLoading && <LoadingOverlay />}
+                <Suspense fallback={<LoadingOverlay />}>
+                  <Editor
+                    height='100%'
+                    defaultLanguage='json'
+                    value={input}
+                    onChange={handleEditorChange}
+                    theme='vs-dark'
+                    options={{
+                      minimap: { enabled: false },
+                      fontSize: 14,
+                      lineNumbers: "on",
+                      scrollBeyondLastLine: false,
+                      wordWrap: "on",
+                      wrappingIndent: "same",
+                      formatOnPaste: true,
+                      formatOnType: true,
+                      automaticLayout: true,
+                      tabSize: 2,
+                      renderWhitespace: "selection",
+                      maxTokenizationLineLength: 20000,
+                      largeFileOptimizations: true,
+                      renderValidationDecorations: "on",
+                      folding: true,
+                      foldingStrategy: "indentation",
+                      scrollbar: {
+                        vertical: "visible",
+                        horizontal: "visible",
+                        useShadows: true,
+                      },
+                      overviewRulerBorder: false,
+                      padding: { top: 16, bottom: 16 },
+                    }}
+                    onValidate={(markers) => {
+                      if (markers.length > 0) {
+                        setError(markers[0].message);
+                      } else {
+                        setError(null);
+                      }
+                    }}
+                  />
+                </Suspense>
+              </div>
+            </div>
+
+            <div className='h-[600px] rounded-lg border overflow-hidden shadow-sm bg-card'>
+              <Editor
+                height='100%'
+                defaultLanguage='json'
+                value={output}
+                theme='vs-dark'
+                options={{
+                  readOnly: true,
+                  minimap: { enabled: false },
+                  fontSize: 14,
+                  lineNumbers: "on",
+                  scrollBeyondLastLine: false,
+                  wordWrap: "on",
+                  wrappingIndent: "same",
+                  automaticLayout: true,
+                  tabSize: 2,
+                  renderWhitespace: "selection",
+                  scrollbar: {
+                    vertical: "visible",
+                    horizontal: "visible",
+                    useShadows: true,
+                  },
+                  overviewRulerBorder: false,
+                  padding: { top: 16, bottom: 16 },
+                }}
+              />
             </div>
           </div>
 
-          <div className="h-[500px] rounded-md border overflow-hidden">
-            <Editor
-              height="100%"
-              defaultLanguage="json"
-              value={output}
-              theme="vs-dark"
-              options={{
-                readOnly: true,
-                minimap: { enabled: false },
-                fontSize: 14,
-                lineNumbers: "on",
-                scrollBeyondLastLine: false,
-                wordWrap: "on",
-                wrappingIndent: "same",
-                automaticLayout: true,
-                tabSize: 2,
-                renderWhitespace: "selection",
-                scrollbar: {
-                  vertical: 'visible',
-                  horizontal: 'visible'
-                }
-              }}
-            />
-          </div>
+          {/* Analysis/Filter Panel */}
+          <AnimatePresence>
+            {activePanel && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                transition={{ duration: 0.2 }}
+                className='overflow-hidden w-full'>
+                <div className='p-6 bg-card rounded-lg border shadow-sm'>
+                  {activePanel === "filter" && (
+                    <FilterView onFilter={handleFilter} />
+                  )}
+                  {activePanel === "analyze" && analysis && (
+                    <AnalysisView analysis={analysis} />
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
-
-        <AnimatePresence>
-          {activePanel && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden w-full"
-            >
-              <div className="p-4 bg-card rounded-lg border">
-                {activePanel === "filter" && <FilterView onFilter={handleFilter} />}
-                {activePanel === "analyze" && analysis && <AnalysisView analysis={analysis} />}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     </div>
   );

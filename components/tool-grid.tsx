@@ -35,7 +35,7 @@ const tools = [
     color: "text-secondary",
     bgColor: "bg-secondary/10",
     href: "/tools/uuid",
-    badge: "bad",
+    badge: "Enhanced",
   },
   {
     id: "base64",
@@ -52,10 +52,10 @@ const tools = [
     name: "CSS Filters",
     description: "Apply and customize CSS filters to images",
     icon: FilterIcon,
-    color: "text-accent", 
-    bgColor: "bg-accent/10", 
-    href: "/tools/css-filt", 
-    badge: "New", 
+    color: "text-accent",
+    bgColor: "bg-accent/10",
+    href: "/tools/css-filt",
+    badge: "New",
   },
 ];
 

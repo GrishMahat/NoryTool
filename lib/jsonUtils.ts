@@ -12,18 +12,25 @@ export interface JSONAnalysis {
       hasTrailingCommas: boolean;
       hasDuplicateKeys: boolean;
     };
+    performance: {
+      parseTime: number;
+      analysisTime: number;
+      totalTime: number;
+    };
   };
   structure: {
     objects: {
       count: number;
       maxNesting: number;
       averageKeys: number;
+      keyDistribution: Record<string, number>;
     };
     arrays: {
       count: number;
       maxLength: number;
       totalItems: number;
       averageLength: number;
+      nestedArrays: number;
     };
     values: {
       strings: {
@@ -33,6 +40,12 @@ export interface JSONAnalysis {
         empty: number;
         min: number;
         max: number;
+        patterns: {
+          dates: number;
+          emails: number;
+          urls: number;
+          uuids: number;
+        };
       };
       numbers: {
         count: number;
@@ -44,6 +57,8 @@ export interface JSONAnalysis {
           min: number;
           max: number;
           average: number;
+          median: number;
+          mode: number[];
         };
       };
       booleans: {
@@ -52,17 +67,28 @@ export interface JSONAnalysis {
         false: number;
       };
       nulls: number;
+      undefined: number;
     };
     paths: {
       longest: string;
       deepest: string[];
       all: string[];
+      circular: string[];
+    };
+    validation: {
+      errors: Array<{
+        path: string;
+        message: string;
+        severity: "error" | "warning";
+      }>;
+      warnings: string[];
     };
   };
   paths: {
     longest: string;
     deepest: string[];
     all: string[];
+    circular: string[];
   };
 }
 
@@ -91,23 +117,52 @@ export interface FilterOptions {
 }
 
 export class JSONUtils {
+  private static readonly DATE_REGEX =
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/;
+  private static readonly EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  private static readonly URL_REGEX =
+    /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/;
+  private static readonly UUID_REGEX =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
   static format(
     json: string,
-    indent: number = 2,
-  ): { formatted: string; error?: string } {
+    indent: number = 2
+  ): {
+    formatted: string;
+    error?: string;
+    performance?: { parseTime: number; formatTime: number };
+  } {
     const validation = this.validate(json);
+
     if (!validation.isValid) {
       return { formatted: json, error: validation.error };
     }
 
     try {
+      const parseStartTime = performance.now();
       const parsed = JSON.parse(json);
+      const parseTime = performance.now() - parseStartTime;
+
+      const formatStartTime = performance.now();
       const formatted = JSON.stringify(parsed, null, indent);
-      return { formatted };
+      const formatTime = performance.now() - formatStartTime;
+
+      return {
+        formatted,
+        performance: {
+          parseTime,
+          formatTime,
+        },
+      };
     } catch (error) {
+      console.error("JSON formatting error:", error);
       return {
         formatted: json,
-        error: error instanceof Error ? error.message : "Formatting failed",
+        error:
+          error instanceof Error
+            ? `Formatting failed: ${error.message}`
+            : "Unknown formatting error occurred",
       };
     }
   }
@@ -142,17 +197,28 @@ export class JSONUtils {
   }
 
   static analyze(json: string): JSONAnalysis {
+    const startTime = performance.now();
+    let parseTime = 0;
+
     try {
+      const parseStartTime = performance.now();
       const parsed = JSON.parse(json);
+      parseTime = performance.now() - parseStartTime;
+
       const analysis: JSONAnalysis = {
         summary: {
-          totalSize: 0,
+          totalSize: new Blob([json]).size,
           totalKeys: 0,
           maxDepth: 0,
           format: {
-            indentation: 0,
-            hasTrailingCommas: false,
-            hasDuplicateKeys: false,
+            indentation: this.detectIndentation(json),
+            hasTrailingCommas: this.hasTrailingCommas(json),
+            hasDuplicateKeys: this.hasDuplicateKeys(json),
+          },
+          performance: {
+            parseTime,
+            analysisTime: 0,
+            totalTime: 0,
           },
         },
         structure: {
@@ -160,12 +226,14 @@ export class JSONUtils {
             count: 0,
             maxNesting: 0,
             averageKeys: 0,
+            keyDistribution: {},
           },
           arrays: {
             count: 0,
             maxLength: 0,
             totalItems: 0,
             averageLength: 0,
+            nestedArrays: 0,
           },
           values: {
             strings: {
@@ -175,6 +243,12 @@ export class JSONUtils {
               empty: 0,
               min: Infinity,
               max: -Infinity,
+              patterns: {
+                dates: 0,
+                emails: 0,
+                urls: 0,
+                uuids: 0,
+              },
             },
             numbers: {
               count: 0,
@@ -186,6 +260,8 @@ export class JSONUtils {
                 min: Infinity,
                 max: -Infinity,
                 average: 0,
+                median: 0,
+                mode: [],
               },
             },
             booleans: {
@@ -194,28 +270,45 @@ export class JSONUtils {
               false: 0,
             },
             nulls: 0,
+            undefined: 0,
           },
           paths: {
             longest: "",
             deepest: [],
             all: [],
+            circular: [],
+          },
+          validation: {
+            errors: [],
+            warnings: [],
           },
         },
         paths: {
           longest: "",
           deepest: [],
           all: [],
+          circular: [],
         },
       };
 
-      let totalKeyLength = 0;
-      let totalKeys = 0;
-      let totalStringLength = 0;
-      let totalStrings = 0;
-      let totalNumbers = 0;
-      let numberSum = 0;
+      const visited = new Set<unknown>();
+      const numbers: number[] = [];
 
-      const analyzeNode = (node: unknown, depth = 0) => {
+      const analyzeNode = (
+        node: unknown,
+        path: string = "",
+        depth = 0
+      ): void => {
+        if (visited.has(node)) {
+          analysis.structure.paths.circular.push(path);
+          analysis.paths.circular.push(path);
+          return;
+        }
+
+        if (typeof node === "object" && node !== null) {
+          visited.add(node);
+        }
+
         analysis.summary.maxDepth = Math.max(analysis.summary.maxDepth, depth);
 
         if (Array.isArray(node)) {
@@ -225,81 +318,188 @@ export class JSONUtils {
             node.length
           );
           analysis.structure.arrays.totalItems += node.length;
-          analysis.structure.arrays.averageLength =
-            analysis.structure.arrays.totalItems /
-            analysis.structure.arrays.count;
-          node.forEach((item) => analyzeNode(item, depth + 1));
+
+          if (node.some((item) => Array.isArray(item))) {
+            analysis.structure.arrays.nestedArrays++;
+          }
+
+          node.forEach((item, index) => {
+            analyzeNode(item, `${path}[${index}]`, depth + 1);
+          });
         } else if (typeof node === "object" && node !== null) {
           analysis.structure.objects.count++;
-          analysis.structure.objects.maxNesting = Math.max(
-            analysis.structure.objects.maxNesting,
-            depth
-          );
-          analysis.structure.objects.averageKeys =
-            totalKeys / analysis.structure.objects.count;
           const keys = Object.keys(node);
-          analysis.summary.totalKeys += keys.length;
 
           keys.forEach((key) => {
-            totalKeyLength += key.length;
-            totalKeys++;
+            analysis.structure.objects.keyDistribution[key] =
+              (analysis.structure.objects.keyDistribution[key] || 0) + 1;
 
-            if (
-              !analysis.structure.paths.longest ||
-              key.length > analysis.structure.paths.longest.length
-            ) {
-              analysis.structure.paths.longest = key;
+            const fullPath = path ? `${path}.${key}` : key;
+            analysis.structure.paths.all.push(fullPath);
+            analysis.paths.all.push(fullPath);
+
+            if (fullPath.length > analysis.structure.paths.longest.length) {
+              analysis.structure.paths.longest = fullPath;
+              analysis.paths.longest = fullPath;
             }
-            analysis.structure.paths.deepest.push(key);
-            analysis.structure.paths.all.push(key);
+
+            analyzeNode(
+              (node as Record<string, unknown>)[key],
+              fullPath,
+              depth + 1
+            );
           });
-
-          Object.values(node).forEach((value) => analyzeNode(value, depth + 1));
         } else {
-          const type = typeof node;
-          analysis.summary.totalKeys++;
-
-          if (type === "string" && typeof node === "string") {
-            totalStringLength += node.length;
-            totalStrings++;
-            analysis.structure.values.strings.min = Math.min(
-              analysis.structure.values.strings.min,
-              node.length
-            );
-            analysis.structure.values.strings.max = Math.max(
-              analysis.structure.values.strings.max,
-              node.length
-            );
-          } else if (type === "number" && typeof node === "number") {
-            totalNumbers++;
-            numberSum += node;
-            analysis.structure.values.numbers.min = Math.min(
-              analysis.structure.values.numbers.min,
-              node
-            );
-            analysis.structure.values.numbers.max = Math.max(
-              analysis.structure.values.numbers.max,
-              node
-            );
-          }
+          this.analyzeValue(node, analysis, path, numbers);
         }
       };
 
       analyzeNode(parsed);
 
-      // Calculate averages
-      analysis.summary.totalKeys = totalKeys ? totalKeyLength / totalKeys : 0;
-      analysis.structure.values.strings.averageLength = totalStrings
-        ? totalStringLength / totalStrings
-        : 0;
-      analysis.structure.values.numbers.stats.average = totalNumbers
-        ? numberSum / totalNumbers
-        : 0;
+      // Calculate final statistics
+      if (numbers.length > 0) {
+        const sorted = numbers.sort((a, b) => a - b);
+        analysis.structure.values.numbers.stats.median =
+          sorted.length % 2 === 0
+            ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+            : sorted[Math.floor(sorted.length / 2)];
+
+        // Calculate mode
+        const frequency: Record<number, number> = {};
+        let maxFreq = 0;
+        numbers.forEach((num) => {
+          frequency[num] = (frequency[num] || 0) + 1;
+          maxFreq = Math.max(maxFreq, frequency[num]);
+        });
+        analysis.structure.values.numbers.stats.mode = Object.entries(frequency)
+          .filter(([, freq]) => freq === maxFreq)
+          .map(([num]) => Number(num));
+      }
+
+      const endTime = performance.now();
+      analysis.summary.performance.analysisTime =
+        endTime - startTime - parseTime;
+      analysis.summary.performance.totalTime = endTime - startTime;
 
       return analysis;
-    } catch {
-      throw new Error("Invalid JSON format");
+    } catch (error) {
+      console.error("JSON analysis error:", error);
+      throw new Error(
+        error instanceof Error
+          ? `Analysis failed: ${error.message}`
+          : "Unknown analysis error occurred"
+      );
     }
+  }
+
+  private static analyzeValue(
+    value: unknown,
+    analysis: JSONAnalysis,
+    path: string,
+    numbers: number[]
+  ): void {
+    switch (typeof value) {
+      case "string":
+        this.analyzeString(value as string, analysis);
+        break;
+      case "number":
+        this.analyzeNumber(value as number, analysis, numbers);
+        break;
+      case "boolean":
+        this.analyzeBoolean(value as boolean, analysis);
+        break;
+      case "undefined":
+        analysis.structure.values.undefined++;
+        analysis.structure.validation.warnings.push(
+          `Undefined value found at path: ${path}`
+        );
+        break;
+      default:
+        if (value === null) {
+          analysis.structure.values.nulls++;
+        }
+    }
+  }
+
+  private static analyzeString(value: string, analysis: JSONAnalysis): void {
+    const { strings } = analysis.structure.values;
+    strings.count++;
+    strings.maxLength = Math.max(strings.maxLength, value.length);
+    strings.min = Math.min(strings.min, value.length);
+    strings.max = Math.max(strings.max, value.length);
+
+    if (value.length === 0) {
+      strings.empty++;
+    }
+
+    // Pattern recognition
+    if (this.DATE_REGEX.test(value)) strings.patterns.dates++;
+    if (this.EMAIL_REGEX.test(value)) strings.patterns.emails++;
+    if (this.URL_REGEX.test(value)) strings.patterns.urls++;
+    if (this.UUID_REGEX.test(value)) strings.patterns.uuids++;
+  }
+
+  private static analyzeNumber(
+    value: number,
+    analysis: JSONAnalysis,
+    numbers: number[]
+  ): void {
+    const { numbers: nums } = analysis.structure.values;
+    nums.count++;
+    numbers.push(value);
+
+    if (Number.isInteger(value)) {
+      nums.integers++;
+    } else {
+      nums.decimals++;
+    }
+
+    nums.min = Math.min(nums.min, value);
+    nums.max = Math.max(nums.max, value);
+    nums.stats.min = Math.min(nums.stats.min, value);
+    nums.stats.max = Math.max(nums.stats.max, value);
+    nums.stats.average =
+      (nums.stats.average * (nums.count - 1) + value) / nums.count;
+  }
+
+  private static analyzeBoolean(value: boolean, analysis: JSONAnalysis): void {
+    const { booleans } = analysis.structure.values;
+    booleans.count++;
+    if (value) {
+      booleans.true++;
+    } else {
+      booleans.false++;
+    }
+  }
+
+  private static detectIndentation(json: string): number {
+    const lines = json.split("\n");
+    for (let i = 1; i < lines.length; i++) {
+      const spaces = lines[i].match(/^\s+/);
+      if (spaces) {
+        return spaces[0].length;
+      }
+    }
+    return 0;
+  }
+
+  private static hasTrailingCommas(json: string): boolean {
+    return /,[\s\n]*[}\]]/.test(json);
+  }
+
+  private static hasDuplicateKeys(json: string): boolean {
+    const keys = new Set<string>();
+    let foundDuplicate = false;
+
+    JSON.parse(json, (key, value) => {
+      if (key && keys.has(key)) {
+        foundDuplicate = true;
+      }
+      keys.add(key);
+      return value;
+    });
+
+    return foundDuplicate;
   }
 
   static validate(json: string): { isValid: boolean; error?: string } {
